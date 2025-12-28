@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Apotek Pro - SQLite System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+</head>
+<body class="bg-slate-100 flex min-h-screen">
+
+    <aside class="w-64 bg-indigo-900 text-white p-6 shadow-xl">
+        <h1 class="text-2xl font-bold mb-8 flex items-center gap-2">💊 ApotekPro</h1>
+        <nav class="space-y-4">
+            <button onclick="changeTab('kasir')" class="w-full text-left p-3 hover:bg-indigo-800 rounded flex items-center gap-2"><i data-lucide="shopping-cart"></i> Kasir</button>
+            <button onclick="changeTab('stok')" class="w-full text-left p-3 hover:bg-indigo-800 rounded flex items-center gap-2"><i data-lucide="package"></i> Manajemen Stok</button>
+        </nav>
+    </aside>
+
+    <main class="flex-1 p-10">
+        
+        <div id="tab-kasir" class="tab-content">
+            <h2 class="text-2xl font-bold mb-6">Kasir Penjualan</h2>
+            <div class="grid grid-cols-3 gap-6">
+                <div class="col-span-2 bg-white p-6 rounded-lg shadow">
+                    <div class="flex gap-4 mb-6">
+                        <select id="sel-obat" class="flex-1 border p-2 rounded"></select>
+                        <input type="number" id="qty-obat" value="1" min="1" class="w-20 border p-2 rounded">
+                        <button onclick="addToCart()" class="bg-indigo-600 text-white px-6 py-2 rounded font-bold">Tambah</button>
+                    </div>
+                    <table class="w-full border-collapse">
+                        <thead><tr class="bg-slate-50 border-b text-left"><th class="p-2">Obat</th><th class="p-2">Harga</th><th class="p-2">Qty</th><th class="p-2 text-right">Subtotal</th></tr></thead>
+                        <tbody id="cart-items"></tbody>
+                    </table>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow h-fit border-t-4 border-indigo-600">
+                    <p class="text-gray-500">TOTAL</p>
+                    <h3 id="total-text" class="text-4xl font-black text-indigo-700 mb-6">Rp 0</h3>
+                    <button onclick="prosesBayar()" class="w-full bg-green-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-green-600">SELESAI TRANSAKSI</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-stok" class="tab-content hidden">
+            <div class="flex justify-between mb-6">
+                <h2 class="text-2xl font-bold">Stok Obat di Database</h2>
+                <button onclick="modalTambahObat()" class="bg-indigo-600 text-white px-4 py-2 rounded">+ Tambah Obat</button>
+            </div>
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="w-full">
+                    <thead class="bg-slate-50 border-b text-left">
+                        <tr><th class="p-4">Nama</th><th class="p-4">Kategori</th><th class="p-4 text-center">Stok</th><th class="p-4 text-right">Harga</th></tr>
+                    </thead>
+                    <tbody id="stok-items"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let items = [];
+        let cart = [];
+
+        // LOAD DATA DARI SERVER
+        async function loadData() {
+            const res = await fetch('/api/obat');
+            items = await res.json();
+            renderStok();
+            renderSelect();
+        }
+
+        function renderStok() {
+            const tbody = document.getElementById('stok-items');
+            tbody.innerHTML = items.map(o => `
+                <tr class="border-b">
+                    <td class="p-4 font-bold">${o.nama}</td>
+                    <td class="p-4 text-gray-500">${o.kategori}</td>
+                    <td class="p-4 text-center ${o.stok < 10 ? 'text-red-600 font-bold' : ''}">${o.stok}</td>
+                    <td class="p-4 text-right">Rp ${o.harga.toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderSelect() {
+            const sel = document.getElementById('sel-obat');
+            sel.innerHTML = items.map(o => `<option value="${o.id}">${o.nama} (Stok: ${o.stok})</option>`).join('');
+        }
+
+        function addToCart() {
+            const id = parseInt(document.getElementById('sel-obat').value);
+            const qty = parseInt(document.getElementById('qty-obat').value);
+            const item = items.find(o => o.id === id);
+            
+            if(item.stok < qty) return alert("Stok tidak cukup!");
+
+            cart.push({ id: item.id, nama: item.nama, harga: item.price || item.harga, qty, subtotal: item.harga * qty });
+            renderCart();
+        }
+
+        function renderCart() {
+            const tbody = document.getElementById('cart-items');
+            tbody.innerHTML = cart.map(c => `
+                <tr class="border-b"><td class="p-2">${c.nama}</td><td class="p-2">${c.harga}</td><td class="p-2">${c.qty}</td><td class="p-2 text-right">Rp ${c.subtotal.toLocaleString()}</td></tr>
+            `).join('');
+            const total = cart.reduce((s, i) => s + i.subtotal, 0);
+            document.getElementById('total-text').innerText = 'Rp ' + total.toLocaleString();
+        }
+
+        async function prosesBayar() {
+            if(cart.length === 0) return;
+            const total = cart.reduce((s, i) => s + i.subtotal, 0);
+
+            const res = await fetch('/api/transaksi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ total, items: cart })
+            });
+
+            if(res.ok) {
+                alert("Transaksi Berhasil Disimpan di Database!");
+                cart = [];
+                renderCart();
+                loadData();
+            }
+        }
+
+        function changeTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.getElementById('tab-' + id).classList.remove('hidden');
+        }
+
+        window.onload = () => {
+            loadData();
+            lucide.createIcons();
+        };
+    </script>
+</body>
+                      </html>
