@@ -12,6 +12,8 @@ db.serialize(() => {
         expired_date DATE
     )`);
 
+
+
     // Tabel Transaksi
     db.run(`CREATE TABLE IF NOT EXISTS transaksi (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,4 +22,14 @@ db.serialize(() => {
     )`);
 });
 
+// ... (tabel sebelumnya)
+    db.run(`CREATE TABLE IF NOT EXISTS detail_transaksi (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaksi_id INTEGER,
+        obat_id INTEGER,
+        qty INTEGER,
+        subtotal INTEGER,
+        FOREIGN KEY(transaksi_id) REFERENCES transaksi(id)
+    )`);
+});
 module.exports = db;
