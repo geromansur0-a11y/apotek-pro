@@ -27,3 +27,22 @@ app.post('/api/transaksi', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server berjalan di http://localhost:${PORT}`));
+
+// Tambahkan di dalam server.js
+
+// API Ambil Laporan Penjualan
+app.get('/api/laporan', (req, res) => {
+    const query = `
+        SELECT t.id, t.tanggal, t.total_harga, 
+        GROUP_CONCAT(o.nama || ' (' || dt.qty || ')') as detail_obat
+        FROM transaksi t
+        JOIN detail_transaksi dt ON t.id = dt.transaksi_id
+        JOIN obat o ON dt.obat_id = o.id
+        GROUP BY t.id ORDER BY t.tanggal DESC
+    `;
+    db.all(query, [], (err, rows) => {
+        res.json(rows);
+    });
+});
+
+// Pastikan database.js Anda memiliki tabel detail_transaksi untuk record yang lebih rapi
